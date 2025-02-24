@@ -1,0 +1,5 @@
+Milestone #1 Report
+
+Number of indexed documents: 55,393
+Number of unique words: 1,109,590 
+total size (in KB) of merged index on disk: 286,077 KB

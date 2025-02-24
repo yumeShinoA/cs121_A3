@@ -173,3 +173,6 @@ cython_debug/
 # Custom added files
 DEV/
 .conda/
+TEMP/
+doc_id_map.json
+final_index.json

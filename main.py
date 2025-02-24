@@ -13,6 +13,7 @@ def main():
     start_time = time.time()
     indexer = Indexer()
     process_json_files("DEV", indexer)
+    indexer.flush()
     indexer.merge_indexes()
     end_time = time.time()
     logging.info(f"Total execution time: {end_time - start_time:.2f} seconds")
