@@ -8,11 +8,18 @@ logging.basicConfig(
 
 from Indexer import Indexer, process_json_files
 import time
+import os
 
 def main():
     start_time = time.time()
     indexer = Indexer()
-    process_json_files("DEV", indexer)
+
+    # Get the directory where main.py is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    dev_path = os.path.join(script_dir, "DEV")  # guaranteed to point to DEV in project root
+    
+    logging.info(f"Searching in: {dev_path}")
+    process_json_files(dev_path, indexer)
     indexer.flush()
     indexer.merge_indexes()
     end_time = time.time()

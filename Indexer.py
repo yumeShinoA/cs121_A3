@@ -19,13 +19,13 @@ def timer(func):
         return result
     return wrapper
 
-# Runtime: O(N) to load the JSON file, where N is the number of entries in the file
+# Runtime: O(1) to load the JSON file line, O(N) for one merge process, where N is the number of entries in the file
 def read_partial_index(file_path):
-    """Generator: Yields (token, postings) from a partial index file without loading everything at once"""
+    """Generator: Yields (token, postings) from a partial index file line by line"""
     with open(file_path, "r") as f:
-        # Load the JSON array once and yield items one by one
-        for item in json.load(f):
-            yield item
+        for line in f:
+            token, postings = json.loads(line)
+            yield token, postings
 
 class Indexer:
     MEMORY_THRESHOLD = 200000  # Artificial memory limit for partial index (number of unique tokens)
@@ -67,17 +67,20 @@ class Indexer:
             self.write_partial_index()
 
     # Runtime: O(k log k), where k is the number of unique tokens in memory (due to sorting).
-    #          JSON dumping is roughly O(k) depending on data size
+    #          JSON dumping is roughly O(k) depending on data size. merging is done line by 
+    #          line via the heap, which keep memory usage low
+    @timer
     def write_partial_index(self):
         """
         Writes the current inverted index to disk as a sorted list of [token, postings] pairs.
         After writing, clears the in-memory index
         """
         sorted_index = sorted(self.inverted_index.items())
-        filename = f"partial_index_{self.partial_index_count}.json"
+        filename = f"partial_index_{self.partial_index_count}.jsonl"
         with open(filename, "w") as f:
-            json.dump(sorted_index, f, indent=4)
-        logging.info(f"Saved partial index: {filename}")
+            for token, postings in sorted_index:
+                json.dump([token, postings], f)  # Write as a JSON list
+                f.write("\n")  # JSONL format: one entry per line
         self.inverted_index.clear()
         self.partial_index_count += 1
 
@@ -90,75 +93,84 @@ class Indexer:
             logging.info("Flushing remaining in-memory index to disk.")
             self.write_partial_index()
 
-    # Runtime: O(T log B) per batch, where T is the total number of tokens in the batch and
-    #          B is the number of partial files in that batch. Then, merging batch results 
-    #          into a global index adds additional overhead
-    def merge_indexes(self, BATCH_SIZE=3):
-        """
-        Merges all partial index files into a final inverted index using a multi-way merge,
-        processing files in batches to avoid loading everything into memory at once.
-        Logs the number of unique tokens in the final index
-        """
-        partial_files = glob.glob("partial_index_*.json")
-        final_index = {}
+    def cleanup_partial_files(self, partial_files):
+        """Deletes partial index files after successful merge."""
+        for file in partial_files:
+            try:
+                os.remove(file)
+                logging.info(f"Deleted partial index file: {file}")
+            except OSError as e:
+                logging.warning(f"Failed to delete {file}: {e}")
 
-        # Process files in batches
-        for i in range(0, len(partial_files), BATCH_SIZE):
-            batch_files = partial_files[i: i + BATCH_SIZE]
-            batch_final = {}
-            iterators = {j: read_partial_index(file) for j, file in enumerate(batch_files)}
-            heap = []
-            # Initialize heap with first element from each iterator
-            for j, it in iterators.items():
-                try:
-                    token, postings = next(it)
-                    heapq.heappush(heap, (token, j, postings))
-                except StopIteration:
-                    pass
+    # Runtime: O(T log P), where T is the total number of tokens across all partial files,
+    #          and P is the number of partial files
+    @timer
+    def merge_indexes(self):
+        """Merges all partial indexes into a final index using a global heap."""
+        partial_files = glob.glob("partial_index_*.jsonl")
+        vocab = {}
+        heap = []
+        iterators = []
 
+        # Open all files and initialize the heap
+        for file in partial_files:
+            it = read_partial_index(file)
+            try:
+                token, postings = next(it)
+                heapq.heappush(heap, (token, len(iterators), postings))
+                iterators.append(it)
+            except StopIteration:
+                pass  # Skip empty files
+
+        # Open final index file for writing
+        with open("final_index.jsonl", "w") as final_file:
+            current_token = None
+            merged_postings = {}
+            
             while heap:
-                current_token, idx, postings = heapq.heappop(heap)
-                merged_postings = postings.copy()
+                token, idx, postings = heapq.heappop(heap)
 
-                # Merge other entries with the same token from the heap
-                while heap and heap[0][0] == current_token:
-                    _, j, postings_j = heapq.heappop(heap)
-                    for doc, freq in postings_j.items():
-                        merged_postings[doc] = merged_postings.get(doc, 0) + freq
-                    try:
-                        next_token, next_postings = next(iterators[j])
-                        heapq.heappush(heap, (next_token, j, next_postings))
-                    except StopIteration:
-                        pass
-
-                # Merge into batch_final
-                if current_token in batch_final:
-                    for doc, freq in merged_postings.items():
-                        batch_final[current_token][doc] = batch_final[current_token].get(doc, 0) + freq
+                if token != current_token:
+                    if current_token is not None:
+                        # Write the previous merged token
+                        entry = [current_token, merged_postings]
+                        position = final_file.tell()
+                        json.dump(entry, final_file)
+                        final_file.write("\n")
+                        vocab[current_token] = position
+                    current_token = token
+                    merged_postings = postings.copy()
                 else:
-                    batch_final[current_token] = merged_postings
+                    # Merge postings for the same token
+                    for doc, freq in postings.items():
+                        merged_postings[doc] = merged_postings.get(doc, 0) + freq
 
+                # Fetch next token from the same iterator
                 try:
                     next_token, next_postings = next(iterators[idx])
                     heapq.heappush(heap, (next_token, idx, next_postings))
                 except StopIteration:
-                    pass
+                    pass  # This iterator is exhausted
 
-            # Merge the batch result into the global final index
-            for token, postings in batch_final.items():
-                if token in final_index:
-                    for doc, freq in postings.items():
-                        final_index[token][doc] = final_index[token].get(doc, 0) + freq
-                else:
-                    final_index[token] = postings
+            # Write the last token
+            if current_token is not None:
+                entry = [current_token, merged_postings]
+                position = final_file.tell()
+                json.dump(entry, final_file)
+                final_file.write("\n")
+                vocab[current_token] = position
 
-        with open("final_index.json", "w") as f:
-            json.dump(final_index, f, indent=4)
-        logging.info(f"Merged indexes into final_index.json with {len(final_index)} unique tokens.")
-
+        # Save vocabulary and doc_id_map
         with open("doc_id_map.json", "w") as f:
             json.dump(self.doc_id_map, f, indent=4)
-        logging.info("Saved document ID mapping into doc_id_map.json")
+
+        with open("vocab.json", "w") as f:
+            json.dump(vocab, f, indent=4)
+
+        logging.info(f"Merged {len(partial_files)} files into final_index.jsonl")
+
+        # Clean up partial index files
+        self.cleanup_partial_files(partial_files)
 
 # Runtime: O(n), where n is the length of the HTML
 def extract_text_from_html(html):
@@ -166,16 +178,25 @@ def extract_text_from_html(html):
     Parses HTML and extracts text, giving extra importance to headings, bold text, and titles
     """
     soup = BeautifulSoup(html, "lxml")
-    title = soup.title.string if soup.title else ""
-    important_text = " ".join([elem.get_text() for elem in soup.find_all(["h1", "h2", "h3", "b", "strong"])])
+    # Use get_text() to safely extract text, defaulting to empty string
+    title = soup.title.get_text(strip=True) if soup.title else ""
+    headers = " ".join(elem.get_text(strip=True) for elem in soup.find_all(["h1", "h2", "h3"]))
+    bold_text = " ".join(elem.get_text(strip=True) for elem in soup.find_all(["b", "strong"]))
     body_text = " ".join(soup.stripped_strings)
-    return f"{title} {important_text} {body_text}"
+    return {
+        "title": title,
+        "headers": headers,
+        "bold": bold_text,
+        "body": body_text if body_text else ""  # Ensure body is not None
+    }
 
 # Runtime: O(n), where n is the length of the text
 def tokenize(text):
     """
     Splits text into alphanumeric tokens
     """
+    if not text:  # Handles None, empty string, etc.
+        return []
     return re.findall(r'\b\w+\b', text.lower())
 
 # Runtime: O(m), where m is the number of tokens
@@ -192,6 +213,11 @@ def process_json_files(root_directory, indexer):
     """
     Recursively processes all JSON files under the given root directory
     """
+    logging.info(f"Processing JSON files in directory: {root_directory}")
+    if not os.path.exists(root_directory):
+        logging.error(f"Directory {root_directory} does not exist!")
+        return
+    
     for subdir, _, _ in os.walk(root_directory):
         json_files = glob.glob(os.path.join(subdir, "*.json"))
         for file in json_files:
@@ -199,7 +225,12 @@ def process_json_files(root_directory, indexer):
                 data = json.load(f)
                 html = data.get("content", "")
                 url = data.get("url", file)  # Use URL if available
-            text = extract_text_from_html(html)
-            tokens = tokenize(text)
-            stemmed_tokens = stem_tokens(tokens)
-            indexer.add_document(url, stemmed_tokens)
+            fields = extract_text_from_html(html)
+            # Tokenize each field
+            title_tokens = stem_tokens(tokenize(fields["title"]))
+            header_tokens = stem_tokens(tokenize(fields["headers"]))
+            bold_tokens = stem_tokens(tokenize(fields["bold"]))
+            body_tokens = stem_tokens(tokenize(fields["body"]))
+            # Apply multipliers to different fields
+            weighted_tokens = (title_tokens * 3) + (header_tokens * 2) + (bold_tokens * 2) + body_tokens
+            indexer.add_document(url, weighted_tokens)

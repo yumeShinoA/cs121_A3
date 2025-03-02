@@ -176,3 +176,5 @@ DEV/
 TEMP/
 doc_id_map.json
 final_index.json
+vocab.json
+search.py
