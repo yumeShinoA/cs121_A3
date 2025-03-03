@@ -2,3 +2,4 @@ beautifulsoup4
 nltk
 ujson
 lxml
+pyqt5
