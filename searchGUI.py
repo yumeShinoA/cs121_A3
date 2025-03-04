@@ -1,3 +1,11 @@
+import logging
+
+logging.basicConfig(
+    filename='query.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 import sys
 import os
 from PyQt5.QtWidgets import (

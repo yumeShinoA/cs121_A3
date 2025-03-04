@@ -1,14 +1,22 @@
 import logging
+import os
+
+# Define the log folder and filename
+log_folder = "logs"
+log_filename = "indexer.log"
+log_path = os.path.join(log_folder, log_filename)
+
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
 
 logging.basicConfig(
-        filename='indexer.log',  # Log file name
+        filename=log_path,  # Log file name
         level=logging.INFO,      # Logging level
         format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
 from Indexer import Indexer, process_json_files
 import time
-import os
 
 def main():
     start_time = time.time()

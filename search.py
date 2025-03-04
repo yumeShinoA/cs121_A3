@@ -1,11 +1,4 @@
 import logging
-
-logging.basicConfig(
-    filename='query.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
 import json
 from Indexer import tokenize, stem_tokens
 

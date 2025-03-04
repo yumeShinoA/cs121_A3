@@ -8,6 +8,7 @@ import time
 from collections import Counter
 from bs4 import BeautifulSoup
 from nltk.stem import PorterStemmer
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def timer(func):
     """Decorator to measure execution time of functions"""
@@ -26,6 +27,27 @@ def read_partial_index(file_path):
         for line in f:
             token, postings = json.loads(line)
             yield token, postings
+
+def process_file(file):
+    """
+    Processes a single JSON file.
+    Reads the file, extracts the HTML content, tokenizes and stems the text,
+    and returns (url, stemmed_tokens).
+    Runtime: O(T) per file, where T is the size of the file.
+    """
+    with open(file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        html = data.get("content", "")
+        url = data.get("url", file)  # Use URL if available
+    fields = extract_text_from_html(html)
+    # Tokenize each field
+    title_tokens = stem_tokens(tokenize(fields["title"]))
+    header_tokens = stem_tokens(tokenize(fields["headers"]))
+    bold_tokens = stem_tokens(tokenize(fields["bold"]))
+    body_tokens = stem_tokens(tokenize(fields["body"]))
+    # Apply multipliers to different fields
+    weighted_tokens = (title_tokens * 3) + (header_tokens * 2) + (bold_tokens * 2) + body_tokens
+    return url, weighted_tokens
 
 class Indexer:
     MEMORY_THRESHOLD = 200000  # Artificial memory limit for partial index (number of unique tokens)
@@ -122,8 +144,10 @@ class Indexer:
             except StopIteration:
                 pass  # Skip empty files
 
+        os.makedirs("Output", exist_ok=True)
+
         # Open final index file for writing
-        with open("final_index.jsonl", "w") as final_file:
+        with open("Output/final_index.jsonl", "w") as final_file:
             current_token = None
             merged_postings = {}
             
@@ -161,10 +185,10 @@ class Indexer:
                 vocab[current_token] = position
 
         # Save vocabulary and doc_id_map
-        with open("doc_id_map.json", "w") as f:
+        with open("Output/doc_id_map.json", "w") as f:
             json.dump(self.doc_id_map, f, indent=4)
 
-        with open("vocab.json", "w") as f:
+        with open("Output/vocab.json", "w") as f:
             json.dump(vocab, f, indent=4)
 
         logging.info(f"Merged {len(partial_files)} files into final_index.jsonl")
@@ -211,26 +235,20 @@ def stem_tokens(tokens):
 #          and stemming (linear in text size), and P is the overhead per document in add_document
 def process_json_files(root_directory, indexer):
     """
-    Recursively processes all JSON files under the given root directory
+    Processes all JSON files under the given root directory in parallel.
+    Uses a ProcessPoolExecutor to process files concurrently
     """
     logging.info(f"Processing JSON files in directory: {root_directory}")
-    if not os.path.exists(root_directory):
-        logging.error(f"Directory {root_directory} does not exist!")
-        return
-    
+    file_list = []
     for subdir, _, _ in os.walk(root_directory):
-        json_files = glob.glob(os.path.join(subdir, "*.json"))
-        for file in json_files:
-            with open(file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                html = data.get("content", "")
-                url = data.get("url", file)  # Use URL if available
-            fields = extract_text_from_html(html)
-            # Tokenize each field
-            title_tokens = stem_tokens(tokenize(fields["title"]))
-            header_tokens = stem_tokens(tokenize(fields["headers"]))
-            bold_tokens = stem_tokens(tokenize(fields["bold"]))
-            body_tokens = stem_tokens(tokenize(fields["body"]))
-            # Apply multipliers to different fields
-            weighted_tokens = (title_tokens * 3) + (header_tokens * 2) + (bold_tokens * 2) + body_tokens
-            indexer.add_document(url, weighted_tokens)
+        file_list.extend(glob.glob(os.path.join(subdir, "*.json")))
+    logging.info(f"Found {len(file_list)} JSON files.")
+
+    with ProcessPoolExecutor() as executor:
+        futures = {executor.submit(process_file, file): file for file in file_list}
+        for future in as_completed(futures):
+            try:
+                url, stemmed_tokens = future.result()
+                indexer.add_document(url, stemmed_tokens)
+            except Exception as e:
+                logging.error(f"Error processing file {futures[future]}: {e}")
