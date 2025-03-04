@@ -9,6 +9,7 @@ from collections import Counter
 from bs4 import BeautifulSoup
 from nltk.stem import PorterStemmer
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from sortedcontainers import SortedDict
 
 def timer(func):
     """Decorator to measure execution time of functions"""
@@ -53,7 +54,7 @@ class Indexer:
     MEMORY_THRESHOLD = 200000  # Artificial memory limit for partial index (number of unique tokens)
 
     def __init__(self):
-        self.inverted_index = {}  # In-memory index: token -> {doc_int: frequency}
+        self.inverted_index = SortedDict()  # In-memory index: token -> {doc_int: frequency}
         self.token_frequencies = Counter()  # Global token frequencies
         self.partial_index_count = 0  # Counter for partial index files
 
@@ -97,13 +98,15 @@ class Indexer:
         Writes the current inverted index to disk as a sorted list of [token, postings] pairs.
         After writing, clears the in-memory index
         """
-        sorted_index = sorted(self.inverted_index.items())
         filename = f"partial_index_{self.partial_index_count}.jsonl"
         with open(filename, "w") as f:
-            for token, postings in sorted_index:
-                json.dump([token, postings], f)  # Write as a JSON list
-                f.write("\n")  # JSONL format: one entry per line
-        self.inverted_index.clear()
+            # Directly iterate over the SortedDict; already sorted.
+            for token, postings in self.inverted_index.items():
+                json.dump([token, postings], f)
+                f.write("\n")
+        logging.info(f"Saved partial index: {filename}")
+        # Reset the in-memory index as an empty SortedDict
+        self.inverted_index = SortedDict()
         self.partial_index_count += 1
 
     # Runtime: O(1) check plus the cost of write_partial_index if data exists
@@ -191,7 +194,7 @@ class Indexer:
         with open("Output/vocab.json", "w") as f:
             json.dump(vocab, f, indent=4)
 
-        logging.info(f"Merged {len(partial_files)} files into final_index.jsonl")
+        logging.info(f"Merged {len(partial_files)} files into final_index.jsonl with {len(vocab)} unique tokens.")
 
         # Clean up partial index files
         self.cleanup_partial_files(partial_files)
