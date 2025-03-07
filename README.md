@@ -7,3 +7,4 @@ TO-DO list:
 3. Basic URL fragment filtering; clustering similar results to remove near-duplicates and provide diverse results
 4. Enhance UI (Display URL's page title, etc.)
 5. Normalize term frequency
+6. Index Tier list - separate index files based on tier use page rank
