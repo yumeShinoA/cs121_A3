@@ -3,3 +3,7 @@ nltk
 ujson
 lxml
 pyqt5
+sortedcontainers
+networkx
+numpy
+scipy

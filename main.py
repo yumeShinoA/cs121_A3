@@ -1,5 +1,7 @@
 import logging
 import os
+import json
+from pageRank import compute_and_save_pagerank
 
 # Define the log folder and filename
 log_folder = "logs"
@@ -30,6 +32,9 @@ def main():
     process_json_files(dev_path, indexer)
     indexer.flush()
     indexer.merge_indexes()
+
+    compute_and_save_pagerank(dev_path)
+
     end_time = time.time()
     logging.info(f"Total execution time: {end_time - start_time:.2f} seconds")
 
