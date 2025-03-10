@@ -14,7 +14,8 @@ pip install -r requirements.txt
 This installs all the necessary libraries.
 
 ### 2. Build the Index
-Run the ```main.py``` indexing script to build the following ```Output``` files:
+Place the JSON dataset in the root directive. Name it ```DEV```.
+Then run the ```main.py``` indexing script to build the following ```Output``` files:
 
 - ```final_index.jsonl``` – The final inverted index.
 - ```vocab.json``` – Vocabulary with file offsets.
@@ -50,4 +51,6 @@ The index files and PageRank scores are saved in the ```Output``` folder for use
 - Make sure your JSON files are placed in the correct folder (```DEV```).
 - If you update the dataset, re-run main.py to rebuild the index.
 - The code uses simple Boolean AND for queries.
+- If encountered any issue, check ```indexer.log``` and ```query.log``` under ```logs``` folder
+- If ```FileNotFoundError```, check config.json to make sure resource path is set correctly.
 
