@@ -14,7 +14,7 @@ pip install -r requirements.txt
 This installs all the necessary libraries.
 
 ### 2. Build the Index
-Run the main indexing script to build the following ```Output``` files:
+Run the ```main.py``` indexing script to build the following ```Output``` files:
 
 - ```final_index.jsonl``` – The final inverted index.
 - ```vocab.json``` – Vocabulary with file offsets.
