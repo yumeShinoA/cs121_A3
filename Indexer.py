@@ -80,7 +80,7 @@ def process_file(file, seen_urls):
     simhash = compute_simhash(body_counts)
 
     # Apply multipliers to different fields
-    weighted_tokens = (title_tokens * 3) + (header_tokens * 2) + (bold_tokens * 2) + body_tokens
+    weighted_tokens = (title_tokens * 4) + (header_tokens * 2) + (bold_tokens * 2) + body_tokens
     return normalized_url, weighted_tokens, simhash
 
 class Indexer:
