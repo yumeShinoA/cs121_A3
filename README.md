@@ -50,4 +50,5 @@ The index files and PageRank scores are saved in the ```Output``` folder for use
 - Make sure your JSON files are placed in the correct folder (```DEV```).
 - If you update the dataset, re-run main.py to rebuild the index.
 - The code uses simple Boolean AND for queries.
+- If encountered any issue, check ```indexer.log``` and ```query.log``` under ```logs``` folder
 
