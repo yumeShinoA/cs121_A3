@@ -1,4 +1,6 @@
 import logging
+import time
+import math
 
 logging.basicConfig(
     filename='query.log',
@@ -58,10 +60,13 @@ class SearchEngineUI(QWidget):
         self.loading_indicator.setRange(0, 0)
         self.loading_indicator.setVisible(False)
         
+        self.query_time_label = QLabel()
+        
         v_layout = QVBoxLayout()
         v_layout.addLayout(h_layout)
         v_layout.addWidget(self.result_count_label)
         v_layout.addWidget(self.loading_indicator)
+        v_layout.addWidget(self.query_time_label)
         v_layout.addWidget(self.results_list)
         
         self.setLayout(v_layout)
@@ -79,9 +84,15 @@ class SearchEngineUI(QWidget):
     
     def search_query(self):
         query = self.query_input.text().strip()
+        start_time = time.time()
         results = self.query_processor.process_query(query)
+        end_time = time.time()
+        query_time = (end_time - start_time) * 1000  # Convert to milliseconds
+        query_time = math.ceil(query_time + 0.1)  # Round up to the nearest millisecond
+        
         self.results_list.clear()
         self.loading_indicator.setVisible(False)
+        self.query_time_label.setText(f"Query time: {query_time} ms")
         if results:
             self.result_count_label.setText(f"Results found: {len(results)}")
             for url in results:
@@ -95,6 +106,7 @@ class SearchEngineUI(QWidget):
         self.query_input.clear()
         self.results_list.clear()
         self.result_count_label.clear()
+        self.query_time_label.clear()
     
     def open_url(self, item):
         """Open the clicked URL in the default web browser."""
