@@ -62,13 +62,7 @@ class QueryProcessor:
     def combine_scores(cosine_scores, pagerank_mapping, alpha=0.7, beta=0.3):
         """
         Combines cosine similarity scores with PageRank scores.
-        Parameters:
-        cosine_scores: dict mapping doc_id -> cosine similarity score.
-        pagerank_mapping: dict mapping doc_id -> PageRank score.
-        alpha: weight for cosine similarity.
-        beta: weight for PageRank.
-        Returns:
-        A dictionary mapping doc_id to a combined score.
+        Returns a dictionary mapping doc_id to a combined score.
         """
         combined = {}
         for doc_id, cos_sim in cosine_scores.items():

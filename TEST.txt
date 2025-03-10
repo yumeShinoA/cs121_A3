@@ -1,0 +1,88 @@
+TEST QUERIES FOR SEARCH ENGINE EVALUATION
+
+# Queries expected to perform well (specific, less ambiguous, moderate result set):
+
+1. machine learning
+   # A common, specific query with relevant content and moderate result volume.
+
+2. cristina lopes
+   # Name, which should return precise results with complete relevancy
+
+3. deep neural networks
+   # Specific technical query that should return focused results.
+
+4. support vector machine
+   # Niche term likely to produce high-quality, relevant results.
+   Actually didn't. 652 results which is a lot. Likely due to these words being common independently.
+   Having proximity check would increase accuracy.
+
+5. natural language processing
+   # Specific domain query with well-defined content.
+
+6. reinforcement learning
+   # Technical query that usually returns fewer but relevant documents.
+
+7. blockchain technology
+   # Emerging tech query with precise terminology. 
+
+8. self driving car
+   # Specific query that should rank well.
+
+9. ICS Student Council
+   # Query that targets a specific field, expecting precise results.
+   Didn't get this result up the list prehaps due to page rank being low. A more comprehensive UCI web dataset should have more hyperlinks to student council page, raising page rank.
+
+10. undergraduate academic advising academic plans
+   # Very specific query, expecting ICS advising homepage to be top result
+
+# Queries expected to perform poorly on one or both criteria:
+
+11. goblin
+    # Rare term that might appear due to indexing errors or hidden content.
+    "goblin" appears in results but isn't visible on the live page, it could be due to hidden text.
+    Didn't have time to deal with hidden text or maybe other reasons for appearing in index.
+
+12. quantum computing
+    # Ambiguous results; may return many documents with varying relevance.
+    TF-IDF ensures "quantum" (a more distinctive term) carries more weight than "computing," reducing ambiguity.
+
+13. data mining
+    # Common term that might return too many results, affecting ranking and efficiency.
+    PageRank prioritizes authoritative sources, surfacing high-quality references over less relevant ones.
+
+14. machine learking
+    # Typo could ruin a search
+    Wanted to implement auto-correction but no time.
+
+15. unsupervised learning
+    # Potentially high-volume results, possibly lowering ranking quality.
+    TF-IDF weighting naturally prioritizes documents where both terms are significant, ensuring better ranking.
+    PageRank helps push authoritative sources higher, preventing lower-quality documents from dominating results.
+
+16. random query string
+    # Likely to return irrelevant results due to low query-document overlap.
+    Cosine similarity prevents partial matches from ranking high, favoring documents with stronger query-term presence.
+
+17. fuzzy matching algorithm
+    # Technical query that might rank poorly if TF-IDF is not discriminative enough.
+    TF-IDF ensures rare terms like "fuzzy" and "algorithm" are weighted higher, improving discrimination.
+    Boolean AND filtering ensures only documents containing all query terms are retrieved, reducing irrelevant results.
+
+18. simhash duplicate removal
+    # Specific to the implementation; may behave unexpectedly if not fine-tuned.
+    Due to Boolean AND query, this query did not return any result.
+    If no documents match all terms, the engine returns no results rather than showing unrelated content.
+
+19. search engine performance
+    # Broad query that may return many irrelevant documents.
+    TF-IDF Weighting Prioritizes Rare & Important Terms.
+    Cosine Similarity Ensures Better Ranking.
+    PageRank Boosts High-Quality Pages
+    Field-Weighted Tokenization Improves Ranking.
+    Documents where "search engine" appears in a title or heading will rank higher than those where the terms are scattered.
+    Although it seems no such document exist.
+
+20. the and of
+    # A stopword-rich query that can cause performance issues and poor ranking due to high frequency.
+    Implemented TF-IDF to reduce score of common words.
+    Optimized query to use efficient index storage and lookup through vocab.json, which stores byte offset for each entry in final_index.jsonl.

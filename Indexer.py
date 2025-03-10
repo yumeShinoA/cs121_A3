@@ -47,12 +47,12 @@ def compute_simhash(token_counts, hash_bits=64):
             simhash |= 1 << i
     return simhash
 
+# Runtime: O(T) per file, where T is the size of the file.
 def process_file(file, seen_urls):
     """
     Processes a single JSON file.
     Reads the file, extracts the HTML content, tokenizes and stems the text,
     and returns (url, stemmed_tokens).
-    Runtime: O(T) per file, where T is the size of the file.
     """
     with open(file, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -141,7 +141,7 @@ class Indexer:
         """
         filename = f"partial_index_{self.partial_index_count}.jsonl"
         with open(filename, "w") as f:
-            # Directly iterate over the SortedDict; already sorted.
+            # Directly iterate over the SortedDict
             for token, postings in self.inverted_index.items():
                 json.dump([token, postings], f)
                 f.write("\n")

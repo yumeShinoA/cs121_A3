@@ -10,25 +10,25 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
+# Runtime: O(n) where n is the length of the HTML.
 def extract_links_from_html(html):
     """
     Parses HTML content and extracts all hyperlinks (absolute URLs).
-    Runtime: O(n) where n is the length of the HTML.
     """
     soup = BeautifulSoup(html, "lxml")
     links = []
     for a_tag in soup.find_all("a", href=True):
         href = a_tag["href"]
-        # Optionally filter out non-http links (e.g., mailto:, javascript:)
+        # filter out non-http links
         if href.startswith("http"):
             links.append(href)
     return links
 
+# Runtime: O(D * L) where D is the number of documents and L is the average number of links per document.
 def build_link_graph(root_directory):
     """
     Walks through JSON files in the given root directory, extracts links,
     and builds a directed graph where each node is a URL and each edge represents a hyperlink.
-    Runtime: O(D * L) where D is the number of documents and L is the average number of links per document.
     """
     G = nx.DiGraph()
     for subdir, _, _ in os.walk(root_directory):
@@ -50,11 +50,11 @@ def build_link_graph(root_directory):
                 logging.error(f"Error processing file {file}: {e}")
     return G
 
+# Runtime: Each iteration is O(N + E), where N is the number of nodes and E the number of edges.
+#    Convergence usually takes a modest number of iterations.
 def compute_and_save_pagerank(root_directory, output_path="Output/page_rank.json", damping=0.85, tol=1.0e-6, max_iter=100):
     """
     Builds the link graph from the JSON files, computes PageRank using NetworkX, and saves the results.
-    Runtime: Each iteration is O(N + E), where N is the number of nodes and E the number of edges.
-    Convergence usually takes a modest number of iterations.
     """
     logging.info("Building link graph for PageRank computation...")
     G = build_link_graph(root_directory)

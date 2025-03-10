@@ -1,0 +1,6 @@
+{
+    "doc_id_map_path": "Output/doc_id_map.json",
+    "final_index_path": "Output/final_index.jsonl",
+    "vocab_path": "Output/vocab.json",
+    "page_rank_path": "Output/page_rank.json"
+}

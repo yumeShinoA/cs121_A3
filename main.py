@@ -11,7 +11,7 @@ if not os.path.exists(log_folder):
 
 logging.basicConfig(
         filename=log_path,  # Log file name
-        level=logging.INFO,      # Logging level
+        level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s'
 )
 

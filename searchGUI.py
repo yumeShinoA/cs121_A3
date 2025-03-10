@@ -1,15 +1,23 @@
 import logging
 import time
 import math
+import os
+
+log_folder = "logs"
+log_filename = "query.log"
+log_path = os.path.join(log_folder, log_filename)
+
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
 
 logging.basicConfig(
-    filename='query.log',
+    filename=log_path,
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
 import sys
-import os
+import json
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
     QPushButton, QListWidget, QListWidgetItem, QLabel, QProgressBar
@@ -116,11 +124,16 @@ class SearchEngineUI(QWidget):
 def main():
     # Locate resource files
     script_dir = os.path.abspath(os.path.dirname(__file__))
-    parent_dir = os.path.dirname(script_dir)
-    doc_id_map_path = os.path.join(parent_dir, "CS121_A3", "Output", "doc_id_map.json")
-    final_index_path = os.path.join(parent_dir, "CS121_A3", "Output", "final_index.jsonl")
-    vocab_path = os.path.join(parent_dir, "CS121_A3", "Output", "vocab.json")
-    page_rank_path = os.path.join(parent_dir, "CS121_A3", "Output", "page_rank.json")
+
+    # Load paths from config.json
+    config_path = os.path.join(script_dir, "config.json")
+    with open(config_path, "r") as f:
+        config = json.load(f)
+
+    doc_id_map_path = os.path.join(script_dir, config["doc_id_map_path"])
+    final_index_path = os.path.join(script_dir, config["final_index_path"])
+    vocab_path = os.path.join(script_dir, config["vocab_path"])
+    page_rank_path = os.path.join(script_dir, config["page_rank_path"])
     
     qp = QueryProcessor(vocab_path, final_index_path, doc_id_map_path, page_rank_path)
     
