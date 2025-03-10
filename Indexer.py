@@ -5,11 +5,14 @@ import re
 import os
 import heapq
 import time
+import hashlib
 from collections import Counter
 from bs4 import BeautifulSoup
 from nltk.stem import PorterStemmer
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sortedcontainers import SortedDict
+from multiprocessing import Manager, Lock
+from urllib.parse import urlparse, urlunparse
 
 def timer(func):
     """Decorator to measure execution time of functions"""
@@ -29,7 +32,22 @@ def read_partial_index(file_path):
             token, postings = json.loads(line)
             yield token, postings
 
-def process_file(file):
+def compute_simhash(token_counts, hash_bits=64):
+    """Generates a SimHash based on token frequencies."""
+    vector = [0] * hash_bits
+    for token, count in token_counts.items():
+        md5 = hashlib.md5(token.encode('utf-8')).digest()
+        h = int.from_bytes(md5[:8], byteorder='big')
+        for i in range(hash_bits):
+            bit = (h >> i) & 1
+            vector[i] += count if bit else -count
+    simhash = 0
+    for i in range(hash_bits):
+        if vector[i] > 0:
+            simhash |= 1 << i
+    return simhash
+
+def process_file(file, seen_urls):
     """
     Processes a single JSON file.
     Reads the file, extracts the HTML content, tokenizes and stems the text,
@@ -40,23 +58,40 @@ def process_file(file):
         data = json.load(f)
         html = data.get("content", "")
         url = data.get("url", file)  # Use URL if available
+    
+    # Normalize URL by removing fragments
+    parsed_url = urlparse(url)
+    normalized_url = urlunparse(parsed_url._replace(fragment=''))
+
+    # Check if the URL has already been processed
+    if normalized_url in seen_urls:
+        logging.warning(f"File {file} has no content or URL.")
+        return None, None, None
+    # Add the URL to the list
+    seen_urls[normalized_url] = True
+
     fields = extract_text_from_html(html)
     # Tokenize each field
     title_tokens = stem_tokens(tokenize(fields["title"]))
     header_tokens = stem_tokens(tokenize(fields["headers"]))
     bold_tokens = stem_tokens(tokenize(fields["bold"]))
     body_tokens = stem_tokens(tokenize(fields["body"]))
+    body_counts = Counter(body_tokens)
+    simhash = compute_simhash(body_counts)
+
     # Apply multipliers to different fields
     weighted_tokens = (title_tokens * 3) + (header_tokens * 2) + (bold_tokens * 2) + body_tokens
-    return url, weighted_tokens
+    return normalized_url, weighted_tokens, simhash
 
 class Indexer:
     MEMORY_THRESHOLD = 200000  # Artificial memory limit for partial index (number of unique tokens)
 
-    def __init__(self):
+    def __init__(self, manager):
         self.inverted_index = SortedDict()  # In-memory index: token -> {doc_int: frequency}
         self.token_frequencies = Counter()  # Global token frequencies
         self.partial_index_count = 0  # Counter for partial index files
+        self.seen_hashes = manager.dict()  # Tracks seen SimHashes
+        self.lock = Lock()  # Lock for synchronizing access to seen_hashes
 
         # Map document URLs to integer IDs for space efficiency
         self.doc_id_map = {}
@@ -71,11 +106,17 @@ class Indexer:
 
     # Runtime: O(m) where m is the number of tokens in the document.
     #          Additionally, checking the threshold is O(1)
-    def add_document(self, doc_url, tokens):
+    def add_document(self, doc_url, tokens, simhash):
         """
         Adds tokens from a document to the inverted index.
         Uses integer doc IDs instead of full URLs
+        Adds document only if it's not a near-duplicate (based on SimHash)
         """
+        with self.lock:
+            if simhash in self.seen_hashes:
+                return
+            self.seen_hashes[simhash] = True
+        
         doc_int = self._get_doc_int(doc_url)
         for token in tokens:
             self.token_frequencies[token] += 1
@@ -247,11 +288,17 @@ def process_json_files(root_directory, indexer):
         file_list.extend(glob.glob(os.path.join(subdir, "*.json")))
     logging.info(f"Found {len(file_list)} JSON files.")
 
+    manager = Manager()
+    seen_urls = manager.dict()
+
     with ProcessPoolExecutor() as executor:
-        futures = {executor.submit(process_file, file): file for file in file_list}
+        futures = {executor.submit(process_file, file, seen_urls): file for file in file_list}
         for future in as_completed(futures):
             try:
-                url, stemmed_tokens = future.result()
-                indexer.add_document(url, stemmed_tokens)
+                result = future.result()
+                if result is not None:
+                    url, stemmed_tokens, simhash = result
+                    if url and stemmed_tokens and simhash:
+                        indexer.add_document(url, stemmed_tokens, simhash)
             except Exception as e:
                 logging.error(f"Error processing file {futures[future]}: {e}")

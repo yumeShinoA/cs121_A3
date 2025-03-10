@@ -1,7 +1,5 @@
 import logging
 import os
-import json
-from pageRank import compute_and_save_pagerank
 
 # Define the log folder and filename
 log_folder = "logs"
@@ -17,12 +15,15 @@ logging.basicConfig(
         format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-from Indexer import Indexer, process_json_files
 import time
+from pageRank import compute_and_save_pagerank
+from Indexer import Indexer, process_json_files
+from multiprocessing import Manager
 
 def main():
     start_time = time.time()
-    indexer = Indexer()
+    manager = Manager()
+    indexer = Indexer(manager)
 
     # Get the directory where main.py is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
